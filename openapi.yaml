@@ -1,0 +1,225 @@
+openapi: 3.1.0
+info:
+  title: Program Harbor API
+  version: 0.1.0
+  description: Stable event-program resources with explicit public/private serialization.
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+paths:
+  /events:
+    get:
+      operationId: listEvents
+      summary: List events
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Event page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageEvents' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /submissions:
+    get:
+      operationId: listSubmissions
+      summary: List submissions
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - { name: status, in: query, schema: { type: string } }
+        - { name: search, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Submission page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageSubmissions' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /speakers:
+    get:
+      operationId: listSpeakers
+      summary: List role-scoped speakers
+      responses:
+        '200':
+          description: Speaker page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageSpeakers' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /sessions:
+    get:
+      operationId: listSessions
+      summary: List canonical sessions
+      responses:
+        '200':
+          description: Session page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageSessions' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /public/agenda:
+    get:
+      security: []
+      operationId: listPublicAgenda
+      summary: List published public schedule
+      responses:
+        '200':
+          description: Public agenda
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageSessions' }
+        '400': { $ref: '#/components/responses/ServerError' }
+  /tasks:
+    get:
+      operationId: listTasks
+      summary: List assigned onboarding tasks
+      responses:
+        '200':
+          description: Task page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageTasks' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /health:
+    get:
+      security: []
+      operationId: getHealth
+      summary: Service and adapter health
+      responses:
+        '200':
+          description: Health status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+        '400': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/Degraded' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    Page: { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+    PageSize: { name: pageSize, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 25 } }
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ServerError:
+      description: Server error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Degraded:
+      description: Service is not ready for the configured storage mode
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Health' }
+  schemas:
+    Event:
+      type: object
+      required: [id, name, slug, timezone]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        slug: { type: string }
+        timezone: { type: string }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+    Submission:
+      type: object
+      required: [id, title, status]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        status: { type: string }
+        category: { type: string }
+        score: { type: [number, 'null'] }
+    Speaker:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        title: { type: string }
+        company: { type: string }
+        bio: { type: string }
+    Session:
+      type: object
+      required: [id, title, status]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        status: { type: string }
+        startsAt: { type: [string, 'null'], format: date-time }
+        endsAt: { type: [string, 'null'], format: date-time }
+        room: { type: [string, 'null'] }
+        track: { type: [string, 'null'] }
+    Task:
+      type: object
+      required: [id, title, status]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        status: { type: string }
+        dueAt: { type: string, format: date-time }
+    PageEvents:
+      type: object
+      required: [data, pagination]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/Event' } }
+        pagination: { $ref: '#/components/schemas/Pagination' }
+    PageSubmissions:
+      type: object
+      required: [data, pagination]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/Submission' } }
+        pagination: { $ref: '#/components/schemas/Pagination' }
+    PageSpeakers:
+      type: object
+      required: [data, pagination]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/Speaker' } }
+        pagination: { $ref: '#/components/schemas/Pagination' }
+    PageSessions:
+      type: object
+      required: [data, pagination]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/Session' } }
+        pagination: { $ref: '#/components/schemas/Pagination' }
+    PageTasks:
+      type: object
+      required: [data, pagination]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/Task' } }
+        pagination: { $ref: '#/components/schemas/Pagination' }
+    Pagination:
+      type: object
+      required: [page, pageSize, total, hasNext]
+      properties:
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+        hasNext: { type: boolean }
+    Health:
+      type: object
+      required: [status, version, storage]
+      properties:
+        status: { type: string, enum: [ok, degraded] }
+        version: { type: string }
+        storage: { type: string }
+        integrations: { type: array, items: { type: object } }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+        operationId: { type: string }
