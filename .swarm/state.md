@@ -102,6 +102,6 @@ Ship and package a credible open-source Sessionboard replacement for the 2026 Ki
 
 ## Next actions
 
-1. Preserve the verified public repository at `github.com/ckorhonen/program-harbor` and commit `7d06ab3`.
+1. Preserve the verified public repository at `github.com/ckorhonen/program-harbor`; implementation commit `7d06ab3` and release receipt `db77c55` are published.
 2. Retain the Cloudflare dry-run blocker; do not create a broken deployment target.
 3. Hand off the paste-ready submission package with exact local evidence and residual blockers.

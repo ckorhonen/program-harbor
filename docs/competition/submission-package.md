@@ -28,7 +28,7 @@ The execution contract is the operative acceptance scope for this entry. It must
 | Browser E2E | 4 passed, 2 intentional mobile skips; mobile project uses Chromium at 390px | VERIFIED LOCALLY |
 | Lint/build | `bun run lint` and `bun run build` passed | VERIFIED LOCALLY |
 | DOM/timing | `bun run audit:dom` passed; `bun run measure:local` recorded warm samples | PARTIAL LOCAL EVIDENCE |
-| Repository | [github.com/ckorhonen/program-harbor](https://github.com/ckorhonen/program-harbor), public `main` at commit `7d06ab3` | VERIFIED REMOTELY |
+| Repository | [github.com/ckorhonen/program-harbor](https://github.com/ckorhonen/program-harbor), public `main` contains implementation commit `7d06ab3` and release receipt `db77c55` | VERIFIED REMOTELY |
 | Deployment | No deployment URL or post-deploy readback | BLOCKED |
 | External providers | No credentials or readback for email, Airtable, Accelevents, or R2 | BLOCKED |
 

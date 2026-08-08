@@ -56,4 +56,4 @@ The pasted task's P0/P1/P2 labels govern the implementation order. The rendered 
 | seed-demo/reset | PASSING locally | Seed count tests, `bun run seed`, reset API, default-off guard, and process-restart readback pass. |
 | storage/external-ops | PARTIAL | Atomic local JSON adapter, permissions, emulator status, and dry-run disclosures exist; Airtable/D1/R2/Cloudflare adapters are not implemented. |
 | security/quality | PARTIAL | Unit/type/lint/build, 4 browser tests + 2 intentional mobile skips, DOM smoke, visual inspection, local timing sample, and adversarial API checks pass; production auth/full WCAG/WebKit remain open. |
-| release | PARTIAL | Public repository `github.com/ckorhonen/program-harbor` is pushed at commit `7d06ab3`; deployment URL/readback and competition submission remain blocked. |
+| release | PARTIAL | Public repository `github.com/ckorhonen/program-harbor` contains implementation commit `7d06ab3` and release receipt `db77c55`; deployment URL/readback and competition submission remain blocked. |
