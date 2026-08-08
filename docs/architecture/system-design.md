@@ -15,14 +15,14 @@ Next route handlers
 StorageAdapter
   ├─ deterministic file adapter (local/demo/test)
   ├─ Airtable adapter (credential-gated)
-  └─ future D1/production adapter boundary
+  └─ D1 adapter (deployed demo) / future production adapters
 ObjectStoreAdapter
   └─ private local object store / R2-compatible boundary
 JobAdapter
   └─ durable local scheduler / Cloudflare Workflow or Queue boundary
 ```
 
-The first deployable slice uses the file adapter because it is deterministic and inspectable in this empty repository. The adapter contract keeps domain logic independent from JSON or Airtable record shapes. A production adapter must provide atomic writes or optimistic concurrency; the demo reset is namespace-scoped and never deletes unrelated resources.
+The local slice uses the file adapter because it is deterministic and inspectable; the deployed demo uses the D1 adapter with optimistic revision checks. The adapter contract keeps domain logic independent from JSON, D1, or Airtable record shapes. The demo reset is namespace-scoped and never deletes unrelated resources.
 
 ## Runtime boundaries
 

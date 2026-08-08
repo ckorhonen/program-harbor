@@ -2,19 +2,19 @@
 
 ## Review result
 
-`PARTIAL` for the local demo and `BLOCKED` for production release. The local review found and fixed several concrete validation, projection, ownership, persistence-permission, schedule-override, and header issues. The remaining demo authentication and provider/deployment gaps are release blockers.
+`PARTIAL` for the deployed demo and `BLOCKED` for production release. The review found and fixed concrete validation, projection, ownership, persistence-permission, schedule-override, and header issues. The remaining demo authentication, file-byte, and provider gaps are release blockers.
 
 ## Evidence and design boundary
 
-| Control area | Local evidence | Review status |
+| Control area | Evidence | Review status |
 | --- | --- | --- |
-| Runtime and local store | Next.js 16.3.0, Bun 1.2.3, JSON target `.data/program-harbor.json` | Local context only |
+| Runtime and store | Next.js 16.3.0, Bun 1.2.3, OpenNext Worker, D1 in deployment; JSON target `.data/program-harbor.json` locally | Deployed demo readback; local file adapter remains development-only |
 | Demo-mode boundary | Dev script sets `PROGRAM_HARBOR_DEMO_MODE=true`; `.env.example` sets `false` | Configuration observed; production auth unverified |
 | Functional checks | 4 unit-test files/18 tests passed; typecheck passed; Chromium E2E 3/3 passed | Functional evidence only |
 | Authorization and privacy | Public, evaluator, and speaker projections are allowlisted; speaker task/profile/file routes are scoped to `speaker-01`; default-off guard was exercised | Demo mode still has no real authenticated principal |
 | Input and output safety | Submission lengths/idempotency/conditional answers, review rubric ranges, schedule override reasons, file metadata limits, and malformed/oversized JSON paths are checked server-side | Full schema coverage and adversarial fuzzing remain incomplete |
 | Secrets and external providers | No live credentials or provider readback | BLOCKED |
-| Deployment | No URL, build readback, or post-deploy smoke result | BLOCKED |
+| Deployment | `https://program-harbor.sourcebottle.workers.dev`, Worker version `f5ea2b9c-178b-4198-ad73-d8e7d584e5ce`, D1 health and route/persistence smoke passed | Demo verified; production auth blocked |
 
 ## Local adversarial receipt
 
@@ -31,11 +31,15 @@ The existing architecture security document is a design reference. Its stated co
 
 ## Required closeout evidence
 
+- Deployed target: Cloudflare Worker URL and version above, built from `0d16cc0`.
+- External boundary: D1 state persistence is live; email, Airtable, Accelevents, R2, and file bytes have no live credentials or readback.
+- Authentication boundary: the public demo uses the explicit unauthenticated demo flag and must not be treated as a production principal.
+
 ## Residual blockers
 
 - `PROGRAM_HARBOR_DEMO_MODE=true` is an intentionally unauthenticated superuser boundary for the dedicated local/demo environment; a production deployment needs real sessions or signed role-scoped tokens before any private mutation is exposed.
 - File handling persists private metadata pointers only; it does not store or serve bytes, so R2/private object-storage behavior remains `BLOCKED`.
-- The file adapter is process-local JSON and is not a multi-instance production store; configured Airtable/D1/R2 modes are not implemented and health reports unsupported modes as degraded.
-- No live email, Airtable, Accelevents, R2, Cloudflare, or deployed endpoint readback exists.
+- The local file adapter is process-local JSON, while the deployed demo uses D1 for the state document; file bytes are still metadata-only and R2 is unconfigured.
+- No live email, Airtable, Accelevents, or R2 readback exists; the deployed Cloudflare endpoint and D1 readback are recorded above.
 
-Before changing this review to release-ready, record the exact deployed target, authentication principal, security test commands/results, environment boundary, and readback for every external operation. Keep provider and deployment claims `BLOCKED` until credentials and readback exist.
+Before changing this review to release-ready, record the exact authentication principal, security test commands/results, environment boundary, and readback for every external operation. Keep provider and production-auth claims `BLOCKED` until credentials and readback exist.

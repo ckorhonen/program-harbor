@@ -1,6 +1,6 @@
 # Data model
 
-The model is intentionally event-scoped and uses stable IDs. The file adapter stores one versioned state document, while Airtable and a future Cloudflare adapter map each entity to its own table/collection.
+The model is intentionally event-scoped and uses stable IDs. The local file adapter and deployed D1 adapter store one versioned state document, while Airtable and future normalized providers can map each entity to its own table/collection.
 
 ## Core entities
 

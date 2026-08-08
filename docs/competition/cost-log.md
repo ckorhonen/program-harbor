@@ -2,14 +2,14 @@
 
 ## Scope
 
-The available packet contains no spend receipt, provider billing readback, deployment record, or external credential. This log therefore records missing cost evidence rather than converting unknown spend into `$0`.
+The packet contains a live Cloudflare demo deployment but no billing receipt or usage readback. This log records the deployment scope without converting unknown spend into `$0`.
 
 ## Recorded costs
 
 | Cost area | Evidence available | Amount | Status |
 | --- | --- | --- | --- |
 | Local development | Local app, Bun, and repository files only | Not recorded | NO COST EVIDENCE |
-| Deployment | No deployment or post-deploy readback | Not recorded | BLOCKED |
+| Deployment | Cloudflare Worker + D1 demo at `program-harbor.sourcebottle.workers.dev`; no billing or usage receipt | Not recorded | DEPLOYED; COST UNVERIFIED |
 | Email delivery | No provider credential or delivery receipt | Not recorded | BLOCKED |
 | Airtable | No credential, base, or readback | Not recorded | BLOCKED |
 | Accelevents | No credential, target event, or sync readback | Not recorded | BLOCKED |

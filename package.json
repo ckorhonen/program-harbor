@@ -18,6 +18,8 @@
     "test:e2e": "playwright test",
     "audit:dom": "tsx scripts/audit-dom.ts",
     "measure:local": "tsx scripts/measure-local.ts",
+    "record:walkthrough": "tsx scripts/record-walkthrough.ts",
+    "monitor:live": "tsx scripts/monitor-live.ts",
     "seed": "PROGRAM_HARBOR_DEMO_MODE=true tsx scripts/seed.ts",
     "reset-demo": "PROGRAM_HARBOR_DEMO_MODE=true tsx scripts/reset-demo.ts"
   },

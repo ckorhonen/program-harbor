@@ -24,4 +24,4 @@ The pasted task supplied with this run is the operative implementation contract 
 
 - No public competition update beyond the brief, walkthrough, and accessible invite was relied on.
 - A public CFP can be inspected without credentials, but admin/evaluator/speaker behavior must be proven by our own browser evidence.
-- Live Accelevents, Airtable, email, and object-storage credentials were not present in the inspected environment. Wrangler account authentication was available, but this repository had no deployable Cloudflare entry point or production storage adapter; a local emulator/adapter can be tested, but live verification must remain explicitly blocked until credentials and a safe target exist.
+- Live Accelevents, Airtable, email, and object-storage credentials were not present in the inspected environment. A subsequent authorized change added an OpenNext Worker, D1 migration, and public demo deployment; the live provider and file-byte claims remain blocked until credentials and readback exist.

@@ -11,4 +11,4 @@ curl http://localhost:3000/api/v1/public/agenda
 PROGRAM_HARBOR_DEMO_MODE=true curl http://localhost:3000/api/v1/sessions?page=1\&pageSize=25
 ```
 
-The API smoke test must run against the actual started server. A local response proves local behavior only; a deployed URL and commit/build readback are required for a release claim.
+The API smoke test must run against the actual started server. The deployed demo was read back at `https://program-harbor.sourcebottle.workers.dev` on Worker version `f5ea2b9c-178b-4198-ad73-d8e7d584e5ce`; that proves the demo surface, not production bearer authentication.

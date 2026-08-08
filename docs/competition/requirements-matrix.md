@@ -1,6 +1,6 @@
 # Requirements matrix
 
-The matrix was frozen before implementation. The `core-01` through `core-19` rows are the pasted task's explicit acceptance scenarios; the source authority column reconciles them with the rendered competition brief. “Equivalent” means a real local/test adapter or emulator is allowed, but the final evidence must state when a live external system was not verified. The current local receipt below is the authoritative status update.
+The matrix was frozen before implementation. The `core-01` through `core-19` rows are the pasted task's explicit acceptance scenarios; the source authority column reconciles them with the rendered competition brief. “Equivalent” means a real local/test adapter or emulator is allowed, but the final evidence must state when a live external system was not verified. The current local plus deployed-demo receipt below is the authoritative status update.
 
 | ID | Priority / authority | Product behavior | UI route | API/server capability | Persistence model | Automated test | Manual verification | Evidence artifact | Status |
 |---|---|---|---|---|---|---|---|---|---|
@@ -52,8 +52,8 @@ The pasted task's P0/P1/P2 labels govern the implementation order. The rendered 
 | core-15 Resources/wiki | BLOCKED | No resource editor/embed implementation in the local UI. |
 | core-16/17 Public gallery and schedule | PASSING locally | Public serializers, no-email check, responsive gallery/schedule, and no-overflow smoke pass. |
 | core-18 Accelevents | PARTIAL | Dry-run emulator and explicit no-credential status exist; live provider contract/readback is blocked. |
-| core-19 Public API | PARTIAL | OpenAPI 3.1, pagination, public agenda, health, local guard, and API docs exist; production bearer auth and deployment smoke are blocked. |
+| core-19 Public API | PARTIAL | OpenAPI 3.1, pagination, public agenda, health, API docs, and deployed route smoke exist; production bearer auth remains unimplemented. |
 | seed-demo/reset | PASSING locally | Seed count tests, `bun run seed`, reset API, default-off guard, and process-restart readback pass. |
-| storage/external-ops | PARTIAL | Atomic local JSON adapter, permissions, emulator status, and dry-run disclosures exist; Airtable/D1/R2/Cloudflare adapters are not implemented. |
+| storage/external-ops | PARTIAL | Atomic local JSON adapter plus deployed D1 state, permissions, emulator status, and dry-run disclosures exist; Airtable/R2/file bytes and live provider adapters remain unconfigured. |
 | security/quality | PARTIAL | Unit/type/lint/build, 4 browser tests + 2 intentional mobile skips, DOM smoke, visual inspection, local timing sample, and adversarial API checks pass; production auth/full WCAG/WebKit remain open. |
-| release | PARTIAL | Public repository `github.com/ckorhonen/program-harbor` contains implementation commit `7d06ab3` and release receipt `db77c55`; deployment URL/readback and competition submission remain blocked. |
+| release | PARTIAL | Public repository plus Cloudflare Worker/D1 demo at `https://program-harbor.sourcebottle.workers.dev` have deployment/version/readback and walkthrough evidence; production auth, live providers, and competition submission remain open. |

@@ -1,6 +1,6 @@
 # Local demo runbook
 
-This runbook covers the repeatable local path for the Program Harbor competition entry. It does not establish a public deployment or a live integration.
+This runbook covers the repeatable local path for the Program Harbor competition entry. The public demo has a separate deployed walkthrough receipt; neither path establishes a live third-party integration.
 
 ## Prepare the local app
 
@@ -45,4 +45,4 @@ Run this when the local demo state needs to be restored:
 bun run reset-demo
 ```
 
-Do not include `.data`, `.env`, test-result directories, screenshots, or credentials in a submission package unless the package explicitly requires a redacted artifact. The competition evidence package must state `BLOCKED` for deployment and live integrations.
+Do not include `.data`, `.env`, test-result directories, screenshots, or credentials in a submission package unless the package explicitly requires a redacted artifact. The competition evidence package must distinguish the verified Cloudflare demo from the still-blocked live integrations and production authentication.

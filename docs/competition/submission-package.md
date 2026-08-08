@@ -2,7 +2,7 @@
 
 ## Submission posture
 
-This package is an evidence receipt for the local Program Harbor entry. It does not claim a public deployment, a competition-form submission, or compatibility with a live provider. The source links for the official materials are already recorded in [the competition source log](source-log.md).
+This package is an evidence receipt for the Program Harbor entry and its public demo deployment. It does not claim a competition-form submission or compatibility with a live provider. The source links for the official materials are already recorded in [the competition source log](source-log.md).
 
 ## Official competition brief
 
@@ -18,10 +18,10 @@ The execution contract is the operative acceptance scope for this entry. It must
 
 ## Evidence receipt
 
-| Area | Recorded local evidence | Status |
+| Area | Recorded evidence | Status |
 | --- | --- | --- |
 | Runtime | Next.js 16.3.0 app; Bun 1.2.3 | VERIFIED LOCALLY |
-| Persistence | File-backed JSON target `.data/program-harbor.json` | VERIFIED LOCALLY |
+| Persistence | File-backed JSON locally; remote D1 database `program-harbor` in deployed demo | VERIFIED LOCALLY + DEPLOYED DEMO |
 | Demo configuration | `PROGRAM_HARBOR_DEMO_MODE=true` in the dev script; `false` in `.env.example` | VERIFIED LOCALLY |
 | Unit tests | 4 unit-test files; 18 tests passed | VERIFIED LOCALLY |
 | Typecheck | Typecheck passed | VERIFIED LOCALLY |
@@ -29,7 +29,8 @@ The execution contract is the operative acceptance scope for this entry. It must
 | Lint/build | `bun run lint` and `bun run build` passed | VERIFIED LOCALLY |
 | DOM/timing | `bun run audit:dom` passed; `bun run measure:local` recorded warm samples | PARTIAL LOCAL EVIDENCE |
 | Repository | [github.com/ckorhonen/program-harbor](https://github.com/ckorhonen/program-harbor), public `main` contains implementation commit `7d06ab3` and release receipt `db77c55` | VERIFIED REMOTELY |
-| Deployment | No deployment URL or post-deploy readback | BLOCKED |
+| Deployment | [program-harbor.sourcebottle.workers.dev](https://program-harbor.sourcebottle.workers.dev), Worker version `f5ea2b9c-178b-4198-ad73-d8e7d584e5ce`; health, route, persistence, and reset readback passed | VERIFIED FOR DEMO |
+| Walkthrough | `bun run record:walkthrough`; 36.96-second live-demo WebM inspected at multiple timestamps | VERIFIED FOR DEMO |
 | External providers | No credentials or readback for email, Airtable, Accelevents, or R2 | BLOCKED |
 
 ## Exact local commands
@@ -59,4 +60,4 @@ These commands were rerun against the final tree. The evidence receipt also reco
 
 ## Claim policy
 
-Only the local evidence in this package may be called verified. Do not add a deployment URL, provider success, email delivery result, R2 object result, performance metric, or accessibility score unless it is observed and recorded with the corresponding readback.
+Only the local evidence and the explicitly recorded deployed-demo evidence in this package may be called verified. Do not add provider success, email delivery result, R2 object result, performance metric, or accessibility score unless it is observed and recorded with the corresponding readback.
