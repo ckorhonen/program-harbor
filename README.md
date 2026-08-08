@@ -2,6 +2,8 @@
 
 Program Harbor is an open-source program-operations desk for conference teams. This repository is a local competition entry: the evidence recorded here distinguishes verified local behavior from unverified deployment and provider behavior.
 
+Repository: [github.com/ckorhonen/program-harbor](https://github.com/ckorhonen/program-harbor)
+
 ## Evidence status
 
 The local verification receipt records a Next.js 16.3.0 app running with Bun 1.2.3, file-backed local JSON persistence at `.data/program-harbor.json`, four unit-test files with 18 tests passed, typecheck, lint, and production build passing. The browser suite passes 4 tests with 2 intentional mobile skips; the mobile project runs Chromium at a 390px viewport because the installed WebKit binary is unavailable.

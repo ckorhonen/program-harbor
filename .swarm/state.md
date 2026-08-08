@@ -46,7 +46,7 @@ Ship and package a credible open-source Sessionboard replacement for the 2026 Ki
 | C5 | Seed/reset/demo access is deterministic and safe | PASSING | Seed counts, reset, default-off guard, and 0700/0600 local state permissions verified |
 | C6 | P1 integrations/API are implemented or accurately blocked with evidence | PARTIAL | OpenAPI/local API and Accelevents emulator pass local checks; live providers blocked |
 | C7 | Accessibility, performance, security, cross-browser, and visual checks are recorded | PARTIAL | DOM/timing/visual/security receipts recorded; WebKit/full WCAG/production security unavailable |
-| C8 | Repository/deployment/submission package is complete and independently audited | PARTIAL | Local repository, docs, evidence packet, and paste-ready package are complete; GitHub push is pending and Cloudflare deployment is blocked by the missing Wrangler entry point/production adapter |
+| C8 | Repository/deployment/submission package is complete and independently audited | PARTIAL | Public GitHub repository, docs, evidence packet, and paste-ready package are complete; Cloudflare deployment is blocked by the missing Wrangler entry point/production adapter |
 
 ## Assumptions
 
@@ -68,7 +68,7 @@ Ship and package a credible open-source Sessionboard replacement for the 2026 Ki
 | W4-P0 | Disjoint feature owners | completed | W3 | Local P0 workflows and seed demo |
 | W5-P1 | Disjoint integration/API owners | partial | P0 passing | OpenAPI, ICS/comms helpers, emulator disclosures; live providers blocked |
 | W6-QA | Fresh QA/auditor | completed | Integrated app | Unit/type/lint/build/browser/DOM/perf/security/visual receipts |
-| W7-RELEASE | Release owner | in_progress | QA gates | GitHub repository, deployment attempt, packaging |
+| W7-RELEASE | Release owner | completed | QA gates | Public GitHub repository, deployment attempt, packaging |
 | W8-AUDIT | Fresh independent auditor | completed | Release artifacts | Security/reliability audit findings reconciled; residual release blockers documented |
 | W3-DOMAIN | Domain worker | completed | Package scaffold, design docs | Domain rules, file storage, seed state, unit tests |
 | W4-COMMS | Calendar/comms worker | completed | Package scaffold | ICS, template rendering, reminder contracts, unit tests |
@@ -102,6 +102,6 @@ Ship and package a credible open-source Sessionboard replacement for the 2026 Ki
 
 ## Next actions
 
-1. Commit the verified tree and create/push the authorized dedicated GitHub repository.
-2. Update this state file with the remote readback and retain the Cloudflare dry-run blocker; do not create a broken deployment target.
+1. Preserve the verified public repository at `github.com/ckorhonen/program-harbor` and commit `7d06ab3`.
+2. Retain the Cloudflare dry-run blocker; do not create a broken deployment target.
 3. Hand off the paste-ready submission package with exact local evidence and residual blockers.
