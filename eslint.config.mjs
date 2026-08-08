@@ -2,7 +2,7 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 
 const config = [
   {
-    ignores: ["artifacts/**", "test-results/**", "playwright-report/**", ".next/**", "coverage/**", "worker-configuration.d.ts"],
+    ignores: ["artifacts/**", "test-results/**", "playwright-report/**", ".next/**", ".open-next/**", "coverage/**", "worker-configuration.d.ts"],
   },
   ...nextVitals,
   {
