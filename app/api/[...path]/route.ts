@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import { generateICS, buildCalendarLinks } from "@/src/lib/calendar";
 import { calculateWeightedReviewScore, completeTaskAssignment, dropHiddenAnswers, evaluateConditionalAnswers, routeSubmission, transitionSubmissionStatus } from "@/src/lib/domain";
 import { renderTemplate } from "@/src/lib/comms";
-import { findDemoEvent, getStore, recalculateConflicts, stateForView } from "@/src/lib/store";
+import { findDemoEvent, getStorageMode, getStore, recalculateConflicts, stateForView } from "@/src/lib/store";
 import type { AppState, Review, ScheduleEntry, Speaker, StoredFile } from "@/src/lib/types";
 
 export const runtime = "nodejs";
@@ -26,10 +26,10 @@ function errorResponse(message: string, status = 400) {
   return json({ error: message, operationId: operationId() }, status);
 }
 
-function healthPayload() {
-  const storage = process.env.PROGRAM_HARBOR_STORAGE || "file";
-  const supported = storage === "file";
-  return { status: supported ? "ok" : "degraded", version: "0.1.0", storage, integrations: [{ provider: "Accelevents", mode: "emulator" }, { provider: "Airtable", mode: "disabled" }], message: supported ? "Local file adapter is active." : "Configured storage mode has no adapter in this build." };
+async function healthPayload() {
+  const storage = await getStorageMode();
+  const supported = storage === "file" || storage === "d1";
+  return { status: supported ? "ok" : "degraded", version: "0.1.0", storage, integrations: [{ provider: "Accelevents", mode: "emulator" }, { provider: "Airtable", mode: "disabled" }], message: storage === "d1" ? "Cloudflare D1 adapter is active." : supported ? "Local file adapter is active." : "Configured storage mode has no adapter in this build." };
 }
 
 function protectedRequest(request: NextRequest) {
@@ -74,16 +74,16 @@ function rateLimit() {
   return current.count <= 10;
 }
 
-function stateAndView(view: "admin" | "evaluator" | "speaker" | "public") {
-  return stateForView(view);
+async function stateAndView(view: "admin" | "evaluator" | "speaker" | "public") {
+  return await stateForView(view);
 }
 
-function currentState() {
-  return getStore().read();
+async function currentState() {
+  return await (await getStore()).read();
 }
 
-function save(mutator: (state: AppState) => void) {
-  return getStore().update(mutator);
+async function save(mutator: (state: AppState) => void) {
+  return await (await getStore()).update(mutator);
 }
 
 function speakerFor(state: AppState, id?: string) {
@@ -103,7 +103,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pat
   const { path = [] } = await context.params;
   const route = path.join("/");
   if (route === "health") {
-    const health = healthPayload();
+    const health = await healthPayload();
     return json(health, health.status === "ok" ? 200 : 503);
   }
   if (route === "state") {
@@ -114,14 +114,14 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pat
       const denied = protectedRequest(request);
       if (denied) return denied;
     }
-    return json(stateAndView(view));
+    return json(await stateAndView(view));
   }
   if (route === "sessions" && request.nextUrl.searchParams.get("format") === "calendar") return errorResponse("A session ID is required for a calendar invite.", 422);
   if (route.endsWith("/calendar.ics")) {
     const denied = protectedRequest(request);
     if (denied) return denied;
     const sessionId = route.split("/")[1];
-    const state = currentState();
+    const state = await currentState();
     const session = sessionFor(state, sessionId);
     const placement = state.scheduleEntries.find((entry) => entry.sessionId === sessionId);
     if (!session || !placement) return errorResponse("This session has no saved placement yet.", 404);
@@ -142,8 +142,8 @@ async function apiResource(request: NextRequest, resource: string) {
   }
   const page = Math.max(1, Number(request.nextUrl.searchParams.get("page") || 1));
   const pageSize = Math.min(100, Math.max(1, Number(request.nextUrl.searchParams.get("pageSize") || 25)));
-  if (resource === "health") { const health = healthPayload(); return json(health, health.status === "ok" ? 200 : 503); }
-  const view = publicResource ? stateForView("public") as any : stateForView("admin") as any;
+  if (resource === "health") { const health = await healthPayload(); return json(health, health.status === "ok" ? 200 : 503); }
+  const view = publicResource ? await stateForView("public") as any : await stateForView("admin") as any;
   const knownResources = new Set(["events", "submissions", "speakers", "sessions", "tasks", "public/agenda"]);
   if (!knownResources.has(resource)) return errorResponse("Unknown API resource.", 404);
   const values = resource === "events" ? [view.event] : resource === "submissions" ? view.submissions : resource === "speakers" ? view.speakers : resource === "sessions" || publicResource ? view.sessions : resource === "tasks" ? view.tasks : [];
@@ -160,8 +160,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ pa
     if (route === "reset") {
       const denied = protectedRequest(request);
       if (denied) return denied;
-      const reset = getStore().resetDemo();
-      return json({ message: "The demo event was reset to its known seed state.", state: stateForView("admin"), reset });
+      const reset = await (await getStore()).resetDemo();
+      return json({ message: "The demo event was reset to its known seed state.", state: await stateForView("admin"), reset });
     }
     if (route === "events") return updateEvent(request);
     if (route === "forms") return updateForms(request);
@@ -183,12 +183,12 @@ export async function POST(request: NextRequest, context: { params: Promise<{ pa
 async function createSubmission(request: NextRequest) {
   if (!rateLimit()) return errorResponse("Too many submissions in this demo window. Try again in a minute.", 429);
   const body = await readBody(request);
-  const state = currentState();
+  const state = await currentState();
   const form = state.submissionForms.find((item) => item.status === "published") || state.submissionForms[0];
   const idempotencyKey = String(body.idempotencyKey || "").trim();
   if (!idempotencyKey) return errorResponse("An idempotency key is required for submission acceptance.", 422);
   const existing = state.submissions.find((item) => idempotencyKey && item.idempotencyKey === idempotencyKey);
-  if (existing) return json({ message: "This proposal was already received.", submissionId: existing.id, state: stateForView("public") });
+  if (existing) return json({ message: "This proposal was already received.", submissionId: existing.id, state: await stateForView("public") });
   const title = String(body.title || "").trim();
   const abstract = String(body.abstract || "").trim();
   const speakerName = String(body.speakerName || "").trim();
@@ -209,7 +209,7 @@ async function createSubmission(request: NextRequest) {
   const supportingFileInput = body.supportingFile && typeof body.supportingFile === "object" ? body.supportingFile : undefined;
   const supportingFile: StoredFile | undefined = supportingFileInput ? { id: `file-${randomUUID().slice(0, 8)}`, name: String(supportingFileInput.name || "supporting-material"), size: Number(supportingFileInput.size || 0), type: String(supportingFileInput.type || "application/octet-stream"), private: true } : undefined;
   let duplicateSubmissionId: string | undefined;
-  const result = save((draft) => {
+  const result = await save((draft) => {
     const duplicate = draft.submissions.find((item) => item.idempotencyKey === idempotencyKey);
     if (duplicate) { duplicateSubmissionId = duplicate.id; return; }
     const event = findDemoEvent(draft);
@@ -220,15 +220,15 @@ async function createSubmission(request: NextRequest) {
     draft.submissions.push({ id: submissionId, eventId: event?.id || "event-demo", formId: form.id, formVersion: form.version, idempotencyKey, title, description: abstract, answers: cleanAnswers, primarySpeakerId: primaryId, coSpeakerIds: coSpeaker ? [coSpeaker.id] : [], ...(supportingFile ? { supportingFile } : {}), route, status: "submitted", createdAt: now, updatedAt: now });
     draft.auditEntries.push({ id: `audit-${randomUUID().slice(0, 8)}`, eventId: event?.id || "event-demo", action: "submission.created", entityType: "submission", entityId: submissionId, actorId: "public-submitter", createdAt: now, details: { routingSource: route.source, categoryId: route.categoryId || null, formVersion: form.version, supportingFile: Boolean(supportingFile) } });
   });
-  if (duplicateSubmissionId) return json({ message: "This proposal was already received.", submissionId: duplicateSubmissionId, state: stateForView("public") });
-  return json({ message: `Proposal routed to ${route.reviewQueue || "general review"}.`, submissionId, state: stateForView("public"), revision: result.revision }, 201);
+  if (duplicateSubmissionId) return json({ message: "This proposal was already received.", submissionId: duplicateSubmissionId, state: await stateForView("public") });
+  return json({ message: `Proposal routed to ${route.reviewQueue || "general review"}.`, submissionId, state: await stateForView("public"), revision: result.revision }, 201);
 }
 
 async function changeSubmissionStatus(request: NextRequest, submissionId: string) {
   const denied = protectedRequest(request); if (denied) return denied;
   const body = await readBody(request); const next = body.status as any; let error: string | undefined;
   try {
-    save((draft) => {
+    await save((draft) => {
       const submission = draft.submissions.find((item) => item.id === submissionId);
       if (!submission) throw new Error("Submission not found.");
       transitionSubmissionStatus(submission.status, next);
@@ -243,12 +243,12 @@ async function changeSubmissionStatus(request: NextRequest, submissionId: string
     });
   } catch (err) { error = err instanceof Error ? err.message : "Status change failed."; }
   if (error) return errorResponse(error, 422);
-  return json({ message: `Submission marked ${next}.`, state: stateForView("admin") });
+  return json({ message: `Submission marked ${next}.`, state: await stateForView("admin") });
 }
 
 async function saveReview(request: NextRequest) {
   const denied = protectedRequest(request); if (denied) return denied;
-  const body = await readBody(request); const state = currentState(); const plan = state.evaluationPlans[0]; const round = state.evaluationRounds[0];
+  const body = await readBody(request); const state = await currentState(); const plan = state.evaluationPlans[0]; const round = state.evaluationRounds[0];
   const submissionId = String(body.submissionId || "");
   const assignment = state.evaluationAssignments.find((item) => item.submissionId === submissionId && item.evaluatorId === "evaluator-01" && item.roundId === round?.id);
   if (!plan || !round || !assignment) return errorResponse("This submission is not assigned to the current evaluator and round.", 403);
@@ -259,33 +259,33 @@ async function saveReview(request: NextRequest) {
   if (scoreEntries.some(([key, value]) => !allowedCriteria.has(key) || !Number.isFinite(Number(value)) || Number(value) < 0 || Number(value) > Number(allowedCriteria.get(key)?.maxScore))) return errorResponse("Each review score must use an assigned criterion and stay within its rubric range.", 422);
   if (!abstained && scoreEntries.length !== allowedCriteria.size) return errorResponse("Complete every rubric criterion or abstain for a documented conflict.", 422);
   const reviewId = `review-${randomUUID().slice(0, 8)}`; const scores = Object.fromEntries(scoreEntries.map(([key, value]) => [key, Number(value)]));
-  save((draft) => { const review: Review = { id: reviewId, roundId: round.id, submissionId, evaluatorId: "evaluator-01", status: abstained ? "abstained" : "submitted", abstained, scores, feedback: String(body.feedback || "").slice(0, 4_000), submittedAt: new Date().toISOString() }; draft.reviews = draft.reviews.filter((item) => !(item.submissionId === review.submissionId && item.evaluatorId === review.evaluatorId && item.roundId === round.id)); draft.reviews.push(review); const draftAssignment = draft.evaluationAssignments.find((item) => item.submissionId === review.submissionId && item.evaluatorId === review.evaluatorId && item.roundId === round.id); if (draftAssignment) draftAssignment.status = review.abstained ? "abstained" : "submitted"; });
-  return json({ message: `Review saved for ${plan.name}.`, state: stateForView("admin") });
+  await save((draft) => { const review: Review = { id: reviewId, roundId: round.id, submissionId, evaluatorId: "evaluator-01", status: abstained ? "abstained" : "submitted", abstained, scores, feedback: String(body.feedback || "").slice(0, 4_000), submittedAt: new Date().toISOString() }; draft.reviews = draft.reviews.filter((item) => !(item.submissionId === review.submissionId && item.evaluatorId === review.evaluatorId && item.roundId === round.id)); draft.reviews.push(review); const draftAssignment = draft.evaluationAssignments.find((item) => item.submissionId === review.submissionId && item.evaluatorId === review.evaluatorId && item.roundId === round.id); if (draftAssignment) draftAssignment.status = review.abstained ? "abstained" : "submitted"; });
+  return json({ message: `Review saved for ${plan.name}.`, state: await stateForView("admin") });
 }
 
 async function completeTask(request: NextRequest, assignmentId: string) {
   const denied = protectedRequest(request); if (denied) return denied;
   const body = await readBody(request); let error: string | undefined;
   if (String(body.speakerId || "") !== "speaker-01") return errorResponse("This demo portal is scoped to speaker-01.", 403);
-  try { save((draft) => { const assignment = draft.taskAssignments.find((item) => item.id === assignmentId); if (!assignment) throw new Error("Task assignment not found."); if (body.speakerId && assignment.speakerId !== body.speakerId) throw new Error("This task does not belong to the current speaker."); const speaker = draft.speakers.find((item) => item.id === assignment.speakerId); if (!speaker) throw new Error("Task speaker not found."); const updated = completeTaskAssignment(assignment, new Date().toISOString()); Object.assign(assignment, updated); draft.auditEntries.push({ id: `audit-${randomUUID().slice(0, 8)}`, eventId: speaker.eventId, action: "task.completed", entityType: "taskAssignment", entityId: assignmentId, actorId: String(body.speakerId || "demo-admin"), createdAt: new Date().toISOString() }); }); } catch (err) { error = err instanceof Error ? err.message : "Task update failed."; }
+  try { await save((draft) => { const assignment = draft.taskAssignments.find((item) => item.id === assignmentId); if (!assignment) throw new Error("Task assignment not found."); if (body.speakerId && assignment.speakerId !== body.speakerId) throw new Error("This task does not belong to the current speaker."); const speaker = draft.speakers.find((item) => item.id === assignment.speakerId); if (!speaker) throw new Error("Task speaker not found."); const updated = completeTaskAssignment(assignment, new Date().toISOString()); Object.assign(assignment, updated); draft.auditEntries.push({ id: `audit-${randomUUID().slice(0, 8)}`, eventId: speaker.eventId, action: "task.completed", entityType: "taskAssignment", entityId: assignmentId, actorId: String(body.speakerId || "demo-admin"), createdAt: new Date().toISOString() }); }); } catch (err) { error = err instanceof Error ? err.message : "Task update failed."; }
   if (error) return errorResponse(error, 422);
-  return json({ message: "Task marked complete; the dashboard will refresh within five seconds.", state: stateForView(body.speakerId ? "speaker" : "admin") });
+  return json({ message: "Task marked complete; the dashboard will refresh within five seconds.", state: await stateForView(body.speakerId ? "speaker" : "admin") });
 }
 
 async function updateSpeaker(request: NextRequest, speakerId: string) {
   const denied = protectedRequest(request); if (denied) return denied; const body = await readBody(request); let found = false;
   if (speakerId !== "speaker-01") return errorResponse("This demo portal is scoped to speaker-01.", 403);
-  save((draft) => { const speaker = speakerFor(draft, speakerId); if (!speaker) return; found = true; for (const key of ["name", "title", "company", "bio"] as const) if (body[key] !== undefined) speaker[key] = String(body[key]); speaker.updatedAt = new Date().toISOString(); });
+  await save((draft) => { const speaker = speakerFor(draft, speakerId); if (!speaker) return; found = true; for (const key of ["name", "title", "company", "bio"] as const) if (body[key] !== undefined) speaker[key] = String(body[key]); speaker.updatedAt = new Date().toISOString(); });
   if (!found) return errorResponse("Speaker not found.", 404);
-  return json({ message: "Speaker profile saved.", state: stateForView("speaker") });
+  return json({ message: "Speaker profile saved.", state: await stateForView("speaker") });
 }
 
 async function uploadMetadata(request: NextRequest) {
   const denied = protectedRequest(request); if (denied) return denied; const body = await readBody(request); const fileId = `file-${randomUUID().slice(0, 8)}`;
   if (String(body.speakerId || "") !== "speaker-01") return errorResponse("A speaker owner is required for private file metadata.", 403);
   if (!String(body.name || "").trim() || !Number.isFinite(Number(body.size)) || Number(body.size) < 0 || Number(body.size) > 25 * 1024 * 1024) return errorResponse("File metadata is invalid or exceeds the 25 MB limit.", 422);
-  const state = save((draft) => { const speaker = speakerFor(draft, body.speakerId || "speaker-01"); if (speaker) { if (String(body.type || "").startsWith("image")) speaker.headshotFileId = fileId; else speaker.slidesFileId = fileId; speaker.updatedAt = new Date().toISOString(); } draft.auditEntries.push({ id: `audit-${randomUUID().slice(0, 8)}`, eventId: speaker?.eventId || "event-ai-engineer-sandbox-summit", action: "file.metadata.created", entityType: "file", entityId: fileId, actorId: String(body.speakerId || "demo-speaker"), createdAt: new Date().toISOString(), details: { name: String(body.name || "upload"), size: Number(body.size || 0), type: String(body.type || "application/octet-stream"), private: true } }); });
-  return json({ message: `${String(body.name || "File")} stored as private metadata.`, file: { id: fileId, name: body.name, private: true }, state: stateForView(body.speakerId ? "speaker" : "public"), revision: state.revision });
+  const state = await save((draft) => { const speaker = speakerFor(draft, body.speakerId || "speaker-01"); if (speaker) { if (String(body.type || "").startsWith("image")) speaker.headshotFileId = fileId; else speaker.slidesFileId = fileId; speaker.updatedAt = new Date().toISOString(); } draft.auditEntries.push({ id: `audit-${randomUUID().slice(0, 8)}`, eventId: speaker?.eventId || "event-ai-engineer-sandbox-summit", action: "file.metadata.created", entityType: "file", entityId: fileId, actorId: String(body.speakerId || "demo-speaker"), createdAt: new Date().toISOString(), details: { name: String(body.name || "upload"), size: Number(body.size || 0), type: String(body.type || "application/octet-stream"), private: true } }); });
+  return json({ message: `${String(body.name || "File")} stored as private metadata.`, file: { id: fileId, name: body.name, private: true }, state: await stateForView(body.speakerId ? "speaker" : "public"), revision: state.revision });
 }
 
 async function scheduleSession(request: NextRequest, sessionId: string) {
@@ -293,13 +293,13 @@ async function scheduleSession(request: NextRequest, sessionId: string) {
   const overrideReason = String(body.overrideReason || "").trim();
   if (body.override && !overrideReason) return errorResponse("An override reason is required when acknowledging a conflict.", 422);
   let conflict = false; let error: string | undefined;
-  try { save((draft) => { const session = sessionFor(draft, sessionId); if (!session) throw new Error("Session not found."); const existing = draft.scheduleEntries.find((entry) => entry.sessionId === sessionId); const entry: ScheduleEntry = { id: existing?.id || `schedule-${randomUUID().slice(0, 8)}`, eventId: session.eventId, sessionId, roomId: String(body.roomId), startsAt: start.toISOString(), endsAt: end.toISOString(), speakerIds: session.speakerIds, moderatorIds: [] }; const others = draft.scheduleEntries.filter((item) => item.sessionId !== sessionId); draft.scheduleEntries = [...others, entry]; recalculateConflicts(draft); conflict = draft.conflicts.some((item) => item.scheduleEntryIds.includes(entry.id) && !item.overridden); if (conflict && !body.override) throw new Error("This placement creates a room or speaker conflict. Review it or acknowledge an override."); if (conflict && body.override) { entry.override = { acknowledged: true, reason: overrideReason }; recalculateConflicts(draft); } draft.auditEntries.push({ id: `audit-${randomUUID().slice(0, 8)}`, eventId: session.eventId, action: body.override ? "schedule.overridden" : "schedule.updated", entityType: "scheduleEntry", entityId: entry.id, actorId: "demo-admin", createdAt: new Date().toISOString(), details: { conflict, roomId: entry.roomId, startsAt: entry.startsAt, endsAt: entry.endsAt, overrideReason: body.override ? overrideReason : null } }); }); } catch (err) { error = err instanceof Error ? err.message : "Schedule update failed."; }
+  try { await save((draft) => { const session = sessionFor(draft, sessionId); if (!session) throw new Error("Session not found."); const existing = draft.scheduleEntries.find((entry) => entry.sessionId === sessionId); const entry: ScheduleEntry = { id: existing?.id || `schedule-${randomUUID().slice(0, 8)}`, eventId: session.eventId, sessionId, roomId: String(body.roomId), startsAt: start.toISOString(), endsAt: end.toISOString(), speakerIds: session.speakerIds, moderatorIds: [] }; const others = draft.scheduleEntries.filter((item) => item.sessionId !== sessionId); draft.scheduleEntries = [...others, entry]; recalculateConflicts(draft); conflict = draft.conflicts.some((item) => item.scheduleEntryIds.includes(entry.id) && !item.overridden); if (conflict && !body.override) throw new Error("This placement creates a room or speaker conflict. Review it or acknowledge an override."); if (conflict && body.override) { entry.override = { acknowledged: true, reason: overrideReason }; recalculateConflicts(draft); } draft.auditEntries.push({ id: `audit-${randomUUID().slice(0, 8)}`, eventId: session.eventId, action: body.override ? "schedule.overridden" : "schedule.updated", entityType: "scheduleEntry", entityId: entry.id, actorId: "demo-admin", createdAt: new Date().toISOString(), details: { conflict, roomId: entry.roomId, startsAt: entry.startsAt, endsAt: entry.endsAt, overrideReason: body.override ? overrideReason : null } }); }); } catch (err) { error = err instanceof Error ? err.message : "Schedule update failed."; }
   if (error) return errorResponse(error, 409);
-  return json({ message: conflict ? "Placement saved with an audited conflict override." : "Placement saved and conflict checks are clear.", state: stateForView("admin") });
+  return json({ message: conflict ? "Placement saved with an audited conflict override." : "Placement saved and conflict checks are clear.", state: await stateForView("admin") });
 }
 
-async function updateEvent(request: NextRequest) { const denied = protectedRequest(request); if (denied) return denied; const body = await readBody(request); save((draft) => { const event = findDemoEvent(draft); if (!event) return; if (body.name) event.name = String(body.name); if (body.timezone) event.timezone = String(body.timezone); if (body.description) event.description = String(body.description); }); return json({ message: "Event settings saved.", state: stateForView("admin") }); }
-async function updateForms(request: NextRequest) { const denied = protectedRequest(request); if (denied) return denied; const body = await readBody(request); save((draft) => { const form = draft.submissionForms[0]; if (!form) return; if (body.action === "publish") form.status = "published"; if (body.action === "add" && body.field) form.fields.push({ id: `field-${randomUUID().slice(0, 8)}`, key: String(body.field.key || "newField"), label: String(body.field.label || "New question"), type: body.field.type || "shortText", required: Boolean(body.field.required) }); form.version += 1; }); return json({ message: body.action === "publish" ? "CFP version published." : "Field added to the draft.", state: stateForView("admin") }); }
-async function createReminder(request: NextRequest) { const denied = protectedRequest(request); if (denied) return denied; const body = await readBody(request); save((draft) => { const event = findDemoEvent(draft); const task = draft.tasks.find((item) => item.id === body.taskId) || draft.tasks.find((item) => item.required); if (event && task) draft.reminders.push({ id: `reminder-${randomUUID().slice(0, 8)}`, eventId: event.id, title: "Demo missing-task reminder", taskId: task.id, scheduledFor: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(), status: "scheduled", recipientFilter: "incompleteRequiredWork" }); }); return json({ message: body.mode === "preview" ? "Reminder audience previewed; no send occurred." : "Reminder scheduled for incomplete required work.", state: stateForView("admin") }); }
-async function previewMessage(request: NextRequest) { const denied = protectedRequest(request); if (denied) return denied; const body = await readBody(request); const state = currentState(); const template = state.communicationTemplates.find((item) => item.kind === (body.template === "reminder" ? "reminder" : "acceptance")) || state.communicationTemplates[0]; if (!template) return errorResponse("No template is configured.", 422); let rendered = ""; try { rendered = renderTemplate(`${template.subject}\n\n${template.body}`, { speakerName: "Jordan Lee", eventName: findDemoEvent(state)?.name || "AI Engineer Sandbox Summit", sessionTitle: "Secure by default", room: "Workshop Room", sessionDate: "Sep 17", sessionTime: "10:00 AM", eventTimezone: findDemoEvent(state)?.timezone || "America/New_York", portalUrl: "/portal", outstandingTaskList: "speaker details", dueDate: "Aug 14" }); } catch (err) { return errorResponse(err instanceof Error ? err.message : "Template cannot render.", 422); } return json({ message: "Preview rendered; no email was sent.", rendered, state: stateForView("admin") }); }
-async function dryRunSync(request: NextRequest) { const denied = protectedRequest(request); if (denied) return denied; const state = currentState(); return json({ message: "Accelevents emulator dry-run completed with no external writes.", mode: "emulator", diff: { create: 2, update: 4, noChange: 8, deletes: 0 }, state: stateForView("admin"), revision: state.revision }); }
+async function updateEvent(request: NextRequest) { const denied = protectedRequest(request); if (denied) return denied; const body = await readBody(request); await save((draft) => { const event = findDemoEvent(draft); if (!event) return; if (body.name) event.name = String(body.name); if (body.timezone) event.timezone = String(body.timezone); if (body.description) event.description = String(body.description); }); return json({ message: "Event settings saved.", state: await stateForView("admin") }); }
+async function updateForms(request: NextRequest) { const denied = protectedRequest(request); if (denied) return denied; const body = await readBody(request); await save((draft) => { const form = draft.submissionForms[0]; if (!form) return; if (body.action === "publish") form.status = "published"; if (body.action === "add" && body.field) form.fields.push({ id: `field-${randomUUID().slice(0, 8)}`, key: String(body.field.key || "newField"), label: String(body.field.label || "New question"), type: body.field.type || "shortText", required: Boolean(body.field.required) }); form.version += 1; }); return json({ message: body.action === "publish" ? "CFP version published." : "Field added to the draft.", state: await stateForView("admin") }); }
+async function createReminder(request: NextRequest) { const denied = protectedRequest(request); if (denied) return denied; const body = await readBody(request); await save((draft) => { const event = findDemoEvent(draft); const task = draft.tasks.find((item) => item.id === body.taskId) || draft.tasks.find((item) => item.required); if (event && task) draft.reminders.push({ id: `reminder-${randomUUID().slice(0, 8)}`, eventId: event.id, title: "Demo missing-task reminder", taskId: task.id, scheduledFor: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(), status: "scheduled", recipientFilter: "incompleteRequiredWork" }); }); return json({ message: body.mode === "preview" ? "Reminder audience previewed; no send occurred." : "Reminder scheduled for incomplete required work.", state: await stateForView("admin") }); }
+async function previewMessage(request: NextRequest) { const denied = protectedRequest(request); if (denied) return denied; const body = await readBody(request); const state = await currentState(); const template = state.communicationTemplates.find((item) => item.kind === (body.template === "reminder" ? "reminder" : "acceptance")) || state.communicationTemplates[0]; if (!template) return errorResponse("No template is configured.", 422); let rendered = ""; try { rendered = renderTemplate(`${template.subject}\n\n${template.body}`, { speakerName: "Jordan Lee", eventName: findDemoEvent(state)?.name || "AI Engineer Sandbox Summit", sessionTitle: "Secure by default", room: "Workshop Room", sessionDate: "Sep 17", sessionTime: "10:00 AM", eventTimezone: findDemoEvent(state)?.timezone || "America/New_York", portalUrl: "/portal", outstandingTaskList: "speaker details", dueDate: "Aug 14" }); } catch (err) { return errorResponse(err instanceof Error ? err.message : "Template cannot render.", 422); } return json({ message: "Preview rendered; no email was sent.", rendered, state: await stateForView("admin") }); }
+async function dryRunSync(request: NextRequest) { const denied = protectedRequest(request); if (denied) return denied; const state = await currentState(); return json({ message: "Accelevents emulator dry-run completed with no external writes.", mode: "emulator", diff: { create: 2, update: 4, noChange: 8, deletes: 0 }, state: await stateForView("admin"), revision: state.revision }); }

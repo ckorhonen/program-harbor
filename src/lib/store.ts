@@ -1,6 +1,7 @@
 import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync, existsSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { calculateOnboardingMetrics, calculateWeightedReviewScore, detectScheduleConflicts } from "./domain";
 import { DEMO_EVENT_ID, DEMO_NAMESPACE, seedDemoState } from "./seed";
 import type { AppState, Id, ScheduleEntry } from "./types";
@@ -9,6 +10,25 @@ const configuredDataRoot = process.env.PROGRAM_HARBOR_DATA_DIR;
 const dataRoot = configuredDataRoot ? path.resolve(configuredDataRoot) : path.join(process.cwd(), ".data");
 const statePath = path.join(dataRoot, "program-harbor.json");
 let cachedState: AppState | undefined;
+
+interface D1PreparedStatement {
+  bind(...values: unknown[]): D1PreparedStatement;
+  first<T>(): Promise<T | null>;
+  run(): Promise<{ meta?: { changes?: number } }>;
+}
+
+interface D1Database {
+  prepare(query: string): D1PreparedStatement;
+}
+
+interface StateRow {
+  id: string;
+  revision: number;
+  state_json: string;
+  updated_at: string;
+}
+
+const D1_STATE_ID = "program-harbor-demo";
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -40,29 +60,29 @@ function persist(next: AppState): AppState {
 }
 
 export interface ProgramStore {
-  read(): AppState;
-  write(next: AppState): AppState;
-  update(mutator: (draft: AppState) => void): AppState;
-  resetDemo(): AppState;
+  read(): Promise<AppState>;
+  write(next: AppState): Promise<AppState>;
+  update(mutator: (draft: AppState) => void): Promise<AppState>;
+  resetDemo(): Promise<AppState>;
 }
 
-const store: ProgramStore = {
-  read() {
+const fileStore: ProgramStore = {
+  async read() {
     if (!cachedState) cachedState = readDisk();
     return clone(cachedState);
   },
-  write(next) {
+  async write(next) {
     const onDisk = readDisk();
     if (onDisk.revision !== next.revision) throw new Error("Concurrent state update detected; reload and retry.");
     const updated = { ...clone(next), revision: next.revision + 1, updatedAt: new Date().toISOString() };
     return persist(updated);
   },
-  update(mutator) {
-    const draft = this.read();
+  async update(mutator) {
+    const draft = await this.read();
     mutator(draft);
-    return this.write(draft);
+    return await this.write(draft);
   },
-  resetDemo() {
+  async resetDemo() {
     if (process.env.PROGRAM_HARBOR_DEMO_MODE !== "true") {
       throw new Error("Demo reset is disabled outside the dedicated demo environment.");
     }
@@ -70,12 +90,73 @@ const store: ProgramStore = {
   },
 };
 
-export function getStore(): ProgramStore {
-  return store;
+class D1ProgramStore implements ProgramStore {
+  constructor(private readonly db: D1Database) {}
+
+  async read(): Promise<AppState> {
+    const row = await this.db.prepare("SELECT id, revision, state_json, updated_at FROM program_state WHERE id = ?1").bind(D1_STATE_ID).first<StateRow>();
+    if (!row) {
+      const seed = seedDemoState();
+      await this.db.prepare("INSERT INTO program_state (id, revision, state_json, updated_at) VALUES (?1, ?2, ?3, ?4)").bind(D1_STATE_ID, seed.revision, JSON.stringify(seed), seed.updatedAt).run();
+      return clone(seed);
+    }
+    return JSON.parse(row.state_json) as AppState;
+  }
+
+  async write(next: AppState): Promise<AppState> {
+    const onDisk = await this.read();
+    if (onDisk.revision !== next.revision) throw new Error("Concurrent state update detected; reload and retry.");
+    const updated = { ...clone(next), revision: next.revision + 1, updatedAt: new Date().toISOString() };
+    const result = await this.db.prepare("UPDATE program_state SET revision = ?1, state_json = ?2, updated_at = ?3 WHERE id = ?4 AND revision = ?5").bind(updated.revision, JSON.stringify(updated), updated.updatedAt, D1_STATE_ID, next.revision).run();
+    if ((result.meta?.changes || 0) !== 1) throw new Error("Concurrent state update detected; reload and retry.");
+    return clone(updated);
+  }
+
+  async update(mutator: (draft: AppState) => void): Promise<AppState> {
+    const draft = await this.read();
+    mutator(draft);
+    return await this.write(draft);
+  }
+
+  async resetDemo(): Promise<AppState> {
+    if (process.env.PROGRAM_HARBOR_DEMO_MODE !== "true") {
+      throw new Error("Demo reset is disabled outside the dedicated demo environment.");
+    }
+    const seed = seedDemoState();
+    await this.db.prepare("INSERT INTO program_state (id, revision, state_json, updated_at) VALUES (?1, ?2, ?3, ?4) ON CONFLICT(id) DO UPDATE SET revision = excluded.revision, state_json = excluded.state_json, updated_at = excluded.updated_at").bind(D1_STATE_ID, seed.revision, JSON.stringify(seed), seed.updatedAt).run();
+    return clone(seed);
+  }
 }
 
-export function resetDemo(): AppState {
-  return store.resetDemo();
+async function cloudflareDatabase(): Promise<D1Database | undefined> {
+  try {
+    const context = await getCloudflareContext({ async: true });
+    return (context.env as { PROGRAM_HARBOR_DB?: D1Database }).PROGRAM_HARBOR_DB;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function getStorageMode(): Promise<"file" | "d1" | "unsupported"> {
+  const configured = String(process.env.PROGRAM_HARBOR_STORAGE || "");
+  if (configured && configured !== "file" && configured !== "d1") return "unsupported";
+  if (configured === "d1" || await cloudflareDatabase()) return "d1";
+  return "file";
+}
+
+export async function getStore(): Promise<ProgramStore> {
+  const mode = await getStorageMode();
+  if (mode === "d1") {
+    const db = await cloudflareDatabase();
+    if (!db) throw new Error("D1 storage is configured but the PROGRAM_HARBOR_DB binding is unavailable.");
+    return new D1ProgramStore(db);
+  }
+  if (mode === "unsupported") throw new Error("Configured storage mode has no adapter in this build.");
+  return fileStore;
+}
+
+export async function resetDemo(): Promise<AppState> {
+  return await (await getStore()).resetDemo();
 }
 
 export type ViewRole = "admin" | "evaluator" | "speaker" | "public";
@@ -172,8 +253,8 @@ function publicState(state: AppState) {
   };
 }
 
-export function stateForView(role: ViewRole): Record<string, unknown> {
-  const state = store.read();
+export async function stateForView(role: ViewRole): Promise<Record<string, unknown>> {
+  const state = await (await getStore()).read();
   if (role === "public") return publicState(state);
   const event = eventFrom(state);
   const metrics = calculateOnboardingMetrics(state.speakers, state.tasks, state.taskAssignments, state.portalFormResults);

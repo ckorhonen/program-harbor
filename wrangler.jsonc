@@ -1,0 +1,26 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "program-harbor",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-08-08",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "PROGRAM_HARBOR_DB",
+      "database_name": "program-harbor",
+      "database_id": "461f96dc-bbf5-4791-8abc-85bcd327bf0d",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "PROGRAM_HARBOR_DEMO_MODE": "true",
+    "PROGRAM_HARBOR_STORAGE": "d1"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

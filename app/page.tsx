@@ -130,7 +130,7 @@ function useAppData(view: string) {
   async function mutate(path: string, body?: AnyRecord, method = "POST") {
     try {
       const response = await fetch(path, { method, headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
-      const payload = await response.json().catch(() => ({}));
+      const payload = await response.json().catch(() => ({} as AnyRecord)) as AnyRecord;
       if (!response.ok) throw new Error(payload.error || `Action failed (${response.status})`);
       if (payload.state) setData(payload.state);
       setToast(payload.message || "Saved to the demo state.");
